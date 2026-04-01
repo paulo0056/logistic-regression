@@ -1,0 +1,9 @@
+kagglehub>=1.0.0
+ucimlrepo
+pandas
+numpy
+scipy
+statsmodels
+scikit-learn
+matplotlib
+openpyxl
