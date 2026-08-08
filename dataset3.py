@@ -1,35 +1,33 @@
+"""
+Análise principal — Cleveland (14 variáveis + desfecho).
+
+Dados: heart_disease_uci.csv (somente linhas dataset=Cleveland), recodificados
+para os códigos numéricos UCI em heart_cleveland_load.py.
+
+Tabelas para a dissertação (TXT): execute gerar_tabelas_txt.py na mesma pasta.
+"""
 import pandas as pd
 import numpy as np
 from scipy.stats import spearmanr, chi2_contingency
 import statsmodels.api as sm
-from sklearn.metrics import roc_curve, roc_auc_score
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_curve, roc_auc_score, brier_score_loss
 import matplotlib.pyplot as plt
-from ucimlrepo import fetch_ucirepo
+from heart_cleveland_load import load_cleveland_dataframe, UCI_CSV
 
 # ==========================
-# 1. CARREGAR DATASET (UCI)
+# 1. CARREGAR DATASET (Cleveland)
 # ==========================
 
-heart_disease = fetch_ucirepo(id=45)
+if not UCI_CSV.is_file():
+    raise FileNotFoundError(
+        f"Arquivo não encontrado: {UCI_CSV}\n"
+        "Coloque heart_disease_uci.csv na pasta do projeto."
+    )
 
-X = heart_disease.data.features
-y = heart_disease.data.targets
-
-df = pd.concat([X, y], axis=1)
-
-print("Colunas originais:", list(df.columns))
-print(f"Total bruto: {len(df)} pacientes")
-print(f"\nMissing por coluna:")
-print(df.isnull().sum())
-
-df["target"] = (df["num"] >= 1).astype(int)
-df = df.drop(columns=["num"])
-
-df = df.dropna()
-df = df.reset_index(drop=True)
-
-print(f"\nAmostra final: {len(df)} pacientes (após remoção de missing values)")
+df, fonte = load_cleveland_dataframe()
+print("Fonte dos dados:", fonte)
+print("Colunas:", list(df.columns))
+print(f"\nAmostra final: {len(df)} pacientes (após remoção de missing em ca/thal/slope)")
 print(f"Target: 0 (sem doença) = {(df['target']==0).sum()}, 1 (com doença) = {(df['target']==1).sum()}")
 
 print("\nPrimeiras linhas:")
@@ -133,14 +131,27 @@ print(resultado.summary())
 prob = resultado.predict(X_reg)
 
 auc = roc_auc_score(y_reg, prob)
+brier = brier_score_loss(y_reg, prob)
+prev = float(y_reg.mean())
+prob_nulo = np.full(shape=len(y_reg), fill_value=prev)
+brier_nulo = brier_score_loss(y_reg, prob_nulo)
 
 print("\nAUC =", auc)
+print(f"Brier score (modelo logístico) = {brier:.6f}")
+print(
+    f"Brier score (referência: probabilidade constante = prevalência {prev:.4f}) = {brier_nulo:.6f}"
+)
+print(
+    "(Quanto menor o Brier, melhor a calibragem combinada com o erro quadrático das probabilidades.)"
+)
 
 fpr, tpr, thresholds = roc_curve(y_reg, prob)
 
 plt.plot(fpr, tpr)
-plt.plot([0, 1], [0, 1])
+plt.plot([0, 1], [0, 1], linestyle="--", color="gray")
 plt.xlabel("False Positive Rate")
 plt.ylabel("True Positive Rate")
 plt.title("Curva ROC")
+plt.tight_layout()
+plt.savefig("curva_roc_dataset3.png", dpi=150)
 plt.show()
